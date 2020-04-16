@@ -139,7 +139,7 @@ sub login_process {
 			my $ssl_mode     = $userfile->{'ssl_mode'};
 			my $code         = $userfile->{'code'};
 			my $ondemand     = $userfile->{'ondemand'};
-			my $ssldomain    = $userfile->{'ssldomain'};
+			my $altdomain    = $userfile->{'altdomain'};
 			# my $easyepg      = $userfile->{'epg'};
 			my $ssl_verify;
 
@@ -212,12 +212,12 @@ sub login_process {
 				}
 			}
 			
-			if( not defined $ssldomain ) {
-				$ssldomain = "false";
-			} elsif( $ssldomain eq "" ) {
-				$ssldomain = "false";
+			if( not defined $altdomain ) {
+				$altdomain = "false";
+			} elsif( $altdomain eq "" ) {
+				$altdomain = "false";
 			} else {
-				INFO "Custom Domain(SSL) \"$ssldomain\" will be used.\n";
+				INFO "Custom Domain \"$altdomain\" will be used.\n";
 			}
 
 
@@ -615,7 +615,7 @@ sub login_process {
 					
 					# CREATE SESSION FILE
 					open my $session_file, ">", "session.json" or die ERROR "UNABLE TO CREATE SESSION FILE!\n\n";
-					print $session_file "{\"provider\":\"$provider\",\"tv_mode\":\"$tv_mode\",\"wilmaa_user_id\":\"$login_user\",\"session_token\":\"$session_token\",\"interface\":\"$interface\",\"address\":\"$customip\",\"ssldomain\":\"$ssldomain\",\"server\":\"$zserver\",\"ffmpeg_lib\":\"$ffmpeglib\",\"port\":\"$port\",\"ssl_mode\":\"$ssl_mode\",\"platform\":\"$user_platform\",\"bandwidth\":\"$user_bandwidth\",\"profile\":\"$user_profile\",\"audio2\":\"$user_audio2\",\"dolby\":\"$user_dolby\",\"loglevel\":\"$user_loglevel\",\"ign_max\":\"$user_maxrate\",\"code\":\"$code\"}";
+					print $session_file "{\"provider\":\"$provider\",\"tv_mode\":\"$tv_mode\",\"wilmaa_user_id\":\"$login_user\",\"session_token\":\"$session_token\",\"interface\":\"$interface\",\"address\":\"$customip\",\"altdomain\":\"$altdomain\",\"server\":\"$zserver\",\"ffmpeg_lib\":\"$ffmpeglib\",\"port\":\"$port\",\"ssl_mode\":\"$ssl_mode\",\"platform\":\"$user_platform\",\"bandwidth\":\"$user_bandwidth\",\"profile\":\"$user_profile\",\"audio2\":\"$user_audio2\",\"dolby\":\"$user_dolby\",\"loglevel\":\"$user_loglevel\",\"ign_max\":\"$user_maxrate\",\"code\":\"$code\"}";
 					close $session_file;
 					
 					sleep 86400;
@@ -672,7 +672,7 @@ sub login_process {
 				
 					# CREATE SESSION FILE
 					open my $session_file, ">", "session.json" or die ERROR "UNABLE TO CREATE SESSION FILE!\n\n";
-					print $session_file "{\"provider\":\"$provider\",\"tv_mode\":\"$tv_mode\",\"interface\":\"$interface\",\"address\":\"$customip\",\"ssldomain\":\"$ssldomain\",\"server\":\"$zserver\",\"ffmpeg_lib\":\"$ffmpeglib\",\"port\":\"$port\",\"ssl_mode\":\"$ssl_mode\",\"platform\":\"$user_platform\",\"bandwidth\":\"$user_bandwidth\",\"profile\":\"$user_profile\",\"audio2\":\"$user_audio2\",\"dolby\":\"$user_dolby\",\"loglevel\":\"$user_loglevel\",\"ign_max\":\"$user_maxrate\",\"code\":\"$code\"}";
+					print $session_file "{\"provider\":\"$provider\",\"tv_mode\":\"$tv_mode\",\"interface\":\"$interface\",\"address\":\"$customip\",\"altdomain\":\"$altdomain\",\"server\":\"$zserver\",\"ffmpeg_lib\":\"$ffmpeglib\",\"port\":\"$port\",\"ssl_mode\":\"$ssl_mode\",\"platform\":\"$user_platform\",\"bandwidth\":\"$user_bandwidth\",\"profile\":\"$user_profile\",\"audio2\":\"$user_audio2\",\"dolby\":\"$user_dolby\",\"loglevel\":\"$user_loglevel\",\"ign_max\":\"$user_maxrate\",\"code\":\"$code\"}";
 					close $session_file;
 					
 					sleep 86400;
@@ -1113,7 +1113,7 @@ sub login_process {
 				
 				# CREATE SESSION FILE
 				open my $session_file, ">", "session.json" or die ERROR "UNABLE TO CREATE SESSION FILE!\n\n";
-				print $session_file "{\"provider\":\"$provider\",\"session_token\":\"$session_token\",\"powerid\":\"$powerid\",\"tv_mode\":\"$tv_mode\",\"country\":\"$country\",\"interface\":\"$interface\",\"address\":\"$customip\",\"ssldomain\":\"$ssldomain\",\"server\":\"$zserver\",\"ffmpeg_lib\":\"$ffmpeglib\",\"port\":\"$port\",\"pin\":\"$pin\",\"ssl_mode\":\"$ssl_mode\",\"platform\":\"$user_platform\",\"bandwidth\":\"$user_bandwidth\",\"profile\":\"$user_profile\",\"audio2\":\"$user_audio2\",\"dolby\":\"$user_dolby\",\"loglevel\":\"$user_loglevel\",\"ign_max\":\"$user_maxrate\",\"code\":\"$code\"}";
+				print $session_file "{\"provider\":\"$provider\",\"session_token\":\"$session_token\",\"powerid\":\"$powerid\",\"tv_mode\":\"$tv_mode\",\"country\":\"$country\",\"interface\":\"$interface\",\"address\":\"$customip\",\"altdomain\":\"$altdomain\",\"server\":\"$zserver\",\"ffmpeg_lib\":\"$ffmpeglib\",\"port\":\"$port\",\"pin\":\"$pin\",\"ssl_mode\":\"$ssl_mode\",\"platform\":\"$user_platform\",\"bandwidth\":\"$user_bandwidth\",\"profile\":\"$user_profile\",\"audio2\":\"$user_audio2\",\"dolby\":\"$user_dolby\",\"loglevel\":\"$user_loglevel\",\"ign_max\":\"$user_maxrate\",\"code\":\"$code\"}";
 				close $session_file;
 				
 				sleep 86400;
@@ -1394,7 +1394,7 @@ sub http_child {
 		my $country       = $session_data->{"country"};
 		my $tv_mode       = $session_data->{"tv_mode"};
 		my $powerid       = $session_data->{"powerid"};
-		my $ssldomain     = $session_data->{"ssldomain"};
+		my $altdomain     = $session_data->{"altdomain"};
 		my $server        = $session_data->{"server"};
 		my $ffmpeglib     = $session_data->{"ffmpeg_lib"};
 		my $pin           = $session_data->{"pin"};
@@ -1731,10 +1731,10 @@ sub http_child {
 											
 											# BASE URL
 											my $base_m3u_url;
-											if( $ssldomain eq "false" ) {
+											if( $altdomain eq "false" ) {
 												$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 											} else {
-												$base_m3u_url = "https://$ssldomain/index.m3u8?channel=" . $chid;
+												$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
 											}
 											
 											# IF QUERY STRING FOR PLATFORM IS SET
@@ -1813,10 +1813,10 @@ sub http_child {
 												
 												# BASE URL
 												my $base_m3u_url;
-												if( $ssldomain eq "false" ) {
+												if( $altdomain eq "false" ) {
 													$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 												} else {
-													$base_m3u_url = "https://$ssldomain/index.m3u8?channel=" . $chid;
+													$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
 												}
 												
 												# IF QUERY STRING FOR PLATFORM IS SET
@@ -1911,10 +1911,10 @@ sub http_child {
 									
 									# BASE URL
 									my $base_m3u_url;
-									if( $ssldomain eq "false" ) {
+									if( $altdomain eq "false" ) {
 										$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 									} else {
-										$base_m3u_url = "https://$ssldomain/index.m3u8?channel=" . $chid;
+										$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
 									}
 									
 									# IF QUERY STRING FOR PLATFORM IS SET
@@ -1993,10 +1993,10 @@ sub http_child {
 										
 										# BASE URL
 										my $base_m3u_url;
-										if( $ssldomain eq "false" ) {
+										if( $altdomain eq "false" ) {
 											$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 										} else {
-											$base_m3u_url = "https://$ssldomain/index.m3u8?channel=" . $chid;
+											$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
 										}
 										
 										# IF QUERY STRING FOR PLATFORM IS SET
@@ -2118,12 +2118,12 @@ sub http_child {
 					}
 					
 					# BASIC SEARCH
-					if( $ssldomain eq "false" ) {
+					if( $altdomain eq "false" ) {
 						$vod_file =~ s/(VOD_ID=)(.*)/http:\/\/$hostip:$port\/index.m3u?vod=$2/g;
 						$vod_file =~ s/(MOVIE_ID=)(.*) (MOVIE_TOKEN=)(.*)/http:\/\/$hostip:$port\/index.m3u?vod_movie=$2\&token=$4/g;
 					} else {
-						$vod_file =~ s/(VOD_ID=)(.*)/https:\/\/$ssldomain\/index.m3u?vod=$2/g;
-						$vod_file =~ s/(MOVIE_ID=)(.*) (MOVIE_TOKEN=)(.*)/https:\/\/$ssldomain\/index.m3u?vod_movie=$2\&token=$4/g;
+						$vod_file =~ s/(VOD_ID=)(.*)/$altdomain\/index.m3u?vod=$2/g;
+						$vod_file =~ s/(MOVIE_ID=)(.*) (MOVIE_TOKEN=)(.*)/$altdomain\/index.m3u?vod_movie=$2\&token=$4/g;
 					}
 					
 					# IF QUERY STRING FOR PLATFORM IS SET
@@ -2441,10 +2441,10 @@ sub http_child {
 										
 										# BASE URL
 										my $base_m3u_url;
-										if( $ssldomain eq "false" ) {
+										if( $altdomain eq "false" ) {
 											$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 										} else {
-											$base_m3u_url = "https://$ssldomain/index.m3u8?channel=" . $chid;
+											$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
 										}
 									
 										# IF QUERY STRING FOR PLATFORM IS SET
@@ -2526,10 +2526,10 @@ sub http_child {
 								
 								# BASE URL
 								my $base_m3u_url;
-								if( $ssldomain eq "false" ) {
+								if( $altdomain eq "false" ) {
 									$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 								} else {
-									$base_m3u_url = "https://$ssldomain/index.m3u8?channel=" . $chid;
+									$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
 								}
 								
 								# IF QUERY STRING FOR PLATFORM IS SET
@@ -2789,10 +2789,10 @@ sub http_child {
 								
 								# BASE URL
 								my $base_m3u_url;
-								if( $ssldomain eq "false" ) {
+								if( $altdomain eq "false" ) {
 									$base_m3u_url = "http://$hostip:$port/index.m3u8?recording=" . $rid;
 								} else {
-									$base_m3u_url = "https://$ssldomain/index.m3u8?recording=" . $rid;
+									$base_m3u_url = "$altdomain/index.m3u8?recording=" . $rid;
 								}
 										
 								# IF QUERY STRING FOR PLATFORM IS SET
@@ -3041,10 +3041,10 @@ sub http_child {
 					
 					# BASE URL
 					my $base_m3u_url;
-					if( $ssldomain eq "false" ) {
+					if( $altdomain eq "false" ) {
 						$base_m3u_url = "http://$hostip:$port/index.m3u8?recording=" . $rid;
 					} else {
-						$base_m3u_url = "https://$ssldomain/index.m3u8?recording=" . $rid;
+						$base_m3u_url = "$altdomain/index.m3u8?recording=" . $rid;
 					}
 								
 					# IF QUERY STRING FOR PLATFORM IS SET
