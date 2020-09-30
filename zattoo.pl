@@ -32,7 +32,7 @@ my $tee = new IO::Tee(\*STDOUT, ">>log.txt");
 select $tee;
 
 print "\n =========================                     I             +        \n";
-print " TELERISING API v0.3.4                          I    I         +        \n";
+print " TELERISING API v0.4.1                          I    I         +        \n";
 print " =========================                       I  I       +      +    \n";
 print "                                                  II                    \n";
 print "ZZZZZZZZZ       AA     TTTTTTTTTT TTTTTTTTTT    888888        888888    \n";
@@ -142,6 +142,12 @@ sub login_process {
 			my $altdomain    = $userfile->{'altdomain'};
 			# my $easyepg      = $userfile->{'epg'};
 			my $ssl_verify;
+			
+			if( defined $ondemand ) {
+				if( $ondemand ne "true" ) {
+					undef $ondemand
+				}
+			}
 
 			# SET DEFAULT VALUES TO REPLACE URL QUERY STRINGS
 			my $user_platform  = $userfile->{'platform'};
@@ -217,7 +223,7 @@ sub login_process {
 			} elsif( $altdomain eq "" ) {
 				$altdomain = "false";
 			} else {
-				INFO "Custom Domain \"$altdomain\" will be used.\n";
+				INFO "Custom Domain(SSL) \"$altdomain\" will be used.\n";
 			}
 
 
@@ -225,7 +231,7 @@ sub login_process {
 				$zserver = "fr5-0";
 			} elsif( $zserver eq "" ) {
 				$zserver = "fr5-0";
-			} elsif( $zserver =~ /fr5-[0-5]|fra3-[0-3]|zh2-[0-9]|zba6-[0-2]|1und1-fra1902-[1-4]|1und1-hhb1000-[1-4]|1und1-dus1901-[1-4]|1und1-ess1901-[1-2]|matterlau1-[0-1]|matterzrh1-[0-1]/ ) {
+			} elsif( $zserver =~ /fr5-[0-5]|fra3-[0-3]|zh2-[0-9]|zba6-[0-2]|1und1-fra1902-[1-4]|1und1-hhb1000-[1-4]|1und1-dus1901-[1-4]|1und1-ess1901-[1-2]|1und1-stu1903-[1-2]|matterlau1-[0-1]|matterzrh1-[0-1]/ ) {
 				INFO "Custom Zattoo server \"$zserver\" will be used.\n";
 			} else {
 				INFO "Custom Zattoo server \"$zserver\" is not supported, default server will be used instead.\n";
@@ -378,7 +384,7 @@ sub login_process {
 			# CHECK PROVIDER
 			if( $provider eq "www.zattoo.com" ) {
 				$provider = "zattoo.com";
-			} elsif( $provider =~ /zattoo.com|wilmaa.com|www.1und1.tv|mobiltv.quickline.com|tvplus.m-net.de|player.waly.tv|www.meinewelt.cc|www.bbv-tv.net|www.vtxtv.ch|www.myvisiontv.ch|iptv.glattvision.ch|www.saktv.ch|nettv.netcologne.de|tvonline.ewe.de|www.quantum-tv.com|tv.salt.ch|tvonline.swb-gruppe.de|tv.eir.ie/ ) {
+			} elsif( $provider =~ /zattoo.com|wilmaa.com|www.1und1.tv|mobiltv.quickline.com|tvplus.m-net.de|player.waly.tv|www.meinewelt.cc|www.bbv-tv.net|www.vtxtv.ch|www.myvisiontv.ch|iptv.glattvision.ch|www.saktv.ch|nettv.netcologne.de|tvonline.ewe.de|www.quantum-tv.com|tv.salt.ch|tvonline.swb-gruppe.de|tv.wambo.ch|tv.eir.ie/ ) {
 				print "";
 			} else {
 				ERROR "Provider is not supported. Please recheck the domain.\n\n";
@@ -688,13 +694,9 @@ sub login_process {
 				# ZATTOO
 				#
 
-				# GET APPTOKEN
-				my $main_url;
-				if( $provider eq "zattoo.com" ) {
-					$main_url      = "https://zattoo.com/int/";
-				} else {
-					$main_url      = "https://$provider/";
-				}
+				# GET LOGIN HTML
+				my $main_url      = "https://$provider/login/";
+				my $apptoken;
 				
 				my $main_agent    = LWP::UserAgent->new(
 					ssl_opts => {
@@ -739,18 +741,188 @@ sub login_process {
 					exit;
 				}
 
-				my @scriptvalues = $zattootree->look_down('type' => 'text/javascript');
-				my $apptoken     = $scriptvalues[0]->as_HTML;
+				my @scriptvalues = $zattootree->look_down(_tag => 'script');
+				my $js_link;
 				
-				if( defined $apptoken ) {
-					$apptoken        =~ s/(.*window.appToken = ')(.*)(';.*)/$2/g;
-				} else {
-					ERROR "UNABLE TO LOGIN TO WEBSERVICE! (unable to retrieve appToken)\n\n";
-					open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
-					print $error_file "UNABLE TO LOGIN TO WEBSERVICE! (unable to retrieve appToken)";
-					close $error_file;
-					exit;
+				foreach my $js_script (@scriptvalues) {
+					
+					$js_script = $js_script->as_HTML;
+					
+					if( $js_script =~ m/<script src="\/app-/ ) {
+						$js_link = $js_script;
+					}
+					
 				}
+				
+				if( defined $js_link ) {
+					$js_link        =~ s/(<script src="\/)(.*)(.js".*)/$2.js/g;
+				
+					# GET APPTOKEN JSON
+					my $js_url = "https://$provider/$js_link";
+					
+					my $js_agent    = LWP::UserAgent->new(
+						ssl_opts => {
+							SSL_verify_mode => $ssl_mode,
+							verify_hostname => $ssl_mode,
+							SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+						},
+						agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+					);
+
+					my $js_request  = HTTP::Request::Common::GET($js_url);
+					my $js_response = $js_agent->request($js_request);
+
+					if( $js_response->is_error ) {
+						ERROR "UNABLE TO LOGIN TO WEBSERVICE! (no internet connection / service unavailable)\n\n";
+						ERROR "RESPONSE:\n\n" . $js_response->content . "\n\n";
+						open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+						print $error_file "UNABLE TO LOGIN TO WEBSERVICE! (no internet connection / service unavailable)";
+						close $error_file;
+						exit;
+					}
+					
+					my $token_url = $js_response->content;
+					$token_url =~ s/(.*)(token-.*)(\.json"})(.*)/$2\.json/g;
+					
+					if( not defined $2 ) {
+						ERROR "UNABLE TO LOGIN TO WEBSERVICE! (unable to parse token URL)\n\n";
+						open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+						print $error_file "UNABLE TO LOGIN TO WEBSERVICE! (unable to parse token URL)";
+						close $error_file;
+						exit;
+					}
+
+					# GET APPTOKEN
+					my $apptoken_url = "https://$provider/$2.json";
+					
+					my $apptoken_agent    = LWP::UserAgent->new(
+						ssl_opts => {
+							SSL_verify_mode => $ssl_mode,
+							verify_hostname => $ssl_mode,
+							SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+						},
+						agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+					);
+
+					my $apptoken_request  = HTTP::Request::Common::GET($apptoken_url);
+					my $apptoken_response = $apptoken_agent->request($apptoken_request);
+					
+					if( $apptoken_response->is_error ) {
+						ERROR "UNABLE TO LOGIN TO WEBSERVICE! (unable to get token json file)\n\n";
+						ERROR "RESPONSE:\n\n" . $apptoken_response->content . "\n\n";
+						open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+						print $error_file "UNABLE TO LOGIN TO WEBSERVICE! (unable to get token json file)";
+						close $error_file;
+						exit;
+					}
+
+					my $analyse_apptoken_login;
+					
+					eval{
+						$analyse_apptoken_login = decode_json($apptoken_response->content);
+					};
+
+					if( not defined $analyse_apptoken_login ) {
+						INFO "Unable to parse apptoken json data (trying old apptoken method now...)\n\n";
+					
+					} else {
+					
+						if( $analyse_apptoken_login->{"success"} ) {
+							$apptoken = $analyse_apptoken_login->{"session_token"}
+						} else {
+							ERROR "Unable to parse apptoken from json file\n\n";
+							open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+							print $error_file "ERROR: Unable to parse apptoken from json file";
+							close $error_file;
+							exit;
+						}
+						
+					}
+					
+				}
+				
+				if( not defined $apptoken ) {
+					
+					my $new_main_url      = "https://$provider/";
+				
+					my $new_main_agent    = LWP::UserAgent->new(
+						ssl_opts => {
+							SSL_verify_mode => $ssl_mode,
+							verify_hostname => $ssl_mode,
+							SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+						},
+						agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+					);
+
+					my $new_main_request  = HTTP::Request::Common::GET($new_main_url);
+					my $new_main_response = $new_main_agent->request($new_main_request);
+
+					if( $new_main_response->is_error ) {
+						ERROR "UNABLE TO LOGIN TO WEBSERVICE! (no internet connection / service unavailable)\n\n";
+						ERROR "RESPONSE:\n\n" . $new_main_response->content . "\n\n";
+						open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+						print $error_file "UNABLE TO LOGIN TO WEBSERVICE! (no internet connection / service unavailable)";
+						close $error_file;
+						exit;
+					}
+
+					my $new_parser        = HTML::Parser->new;
+					my $new_main_content  = $new_main_response->content;
+					
+					foreach my $js_script (@scriptvalues) {
+						
+						if( $js_script =~ m/<script type="text\/javascript">window.appToken/ ) {
+							$apptoken = $js_script;
+						}
+						
+					}
+					
+					if( defined $apptoken ) {
+						$apptoken        =~ s/(.*window.appToken = ')(.*)(';.*)/$2/g;
+					} else {
+						INFO "Unable to retrieve apptoken (trying another apptoken method now...)\n\n";
+					}
+				}
+				
+				if( not defined $apptoken ) {
+					
+					my $new_token_url = "https://$provider/token-46a1dfccbd4c3bdaf6182fea8f8aea3f.json";
+					
+					my $new_token_agent    = LWP::UserAgent->new(
+						ssl_opts => {
+							SSL_verify_mode => $ssl_mode,
+							verify_hostname => $ssl_mode,
+							SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+						},
+						agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+					);
+
+					my $new_token_request  = HTTP::Request::Common::GET($new_token_url);
+					my $new_token_response = $new_token_agent->request($new_token_request);
+
+					if( $new_token_response->is_error ) {
+						ERROR "UNABLE TO LOGIN TO WEBSERVICE! (no internet connection / service unavailable)\n\n";
+						ERROR "RESPONSE:\n\n" . $new_token_response->content . "\n\n";
+						open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+						print $error_file "UNABLE TO LOGIN TO WEBSERVICE! (no internet connection / service unavailable)";
+						close $error_file;
+						exit;
+					}
+					
+					my $new_token_content  = $new_token_response->content;
+					
+					if( $new_token_content =~ m/{"success": true, "session_token": "/ ) {
+						$apptoken = $new_token_content;
+						$apptoken =~ s/(\{"success": true, "session_token": ")(.*)("\})/$2/g;
+					} else {
+						ERROR "UNABLE TO LOGIN TO WEBSERVICE! (unable to retrieve apptoken)\n\n";
+						open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+						print $error_file "UNABLE TO LOGIN TO WEBSERVICE! (unable to retrieve apptoken)";
+						close $error_file;
+						exit;
+					}
+				}
+					
 
 				# GET SESSION ID
 				my $session_url    = "https://$provider/zapi/session/hello";
@@ -1355,6 +1527,11 @@ sub http_child {
 		
 		# SET API ACCESS CODE
 		my $access   = $params->{'code'};
+		
+		# SET INFO TAG
+		my $info     = $params->{'info'};
+		my $vod_info = $params->{'vod_info'};
+		my $mov_info = $params->{'vod_movie_info'};
 		
 		# READ SESSION FILE
 		if( not -e "session.json" ) {
@@ -2122,8 +2299,8 @@ sub http_child {
 						$vod_file =~ s/(VOD_ID=)(.*)/http:\/\/$hostip:$port\/index.m3u?vod=$2/g;
 						$vod_file =~ s/(MOVIE_ID=)(.*) (MOVIE_TOKEN=)(.*)/http:\/\/$hostip:$port\/index.m3u?vod_movie=$2\&token=$4/g;
 					} else {
-						$vod_file =~ s/(VOD_ID=)(.*)/$altdomain\/index.m3u?vod=$2/g;
-						$vod_file =~ s/(MOVIE_ID=)(.*) (MOVIE_TOKEN=)(.*)/$altdomain\/index.m3u?vod_movie=$2\&token=$4/g;
+						$vod_file =~ s/(VOD_ID=)(.*)/https:\/\/$altdomain\/index.m3u?vod=$2/g;
+						$vod_file =~ s/(MOVIE_ID=)(.*) (MOVIE_TOKEN=)(.*)/https:\/\/$altdomain\/index.m3u?vod_movie=$2\&token=$4/g;
 					}
 					
 					# IF QUERY STRING FOR PLATFORM IS SET
@@ -2747,6 +2924,7 @@ sub http_child {
 					my $name         = $rec_data->{'title'};
 					my $episode      = $rec_data->{'episode_title'};
 					my $cid          = $rec_data->{'cid'};
+					my $pid          = $rec_data->{'program_id'};
 					my $record_start = $rec_data->{'start'};
 					my $image        = $rec_data->{'image_url'};
 					my $rid          = $rec_data->{'id'};
@@ -2782,9 +2960,9 @@ sub http_child {
 							
 							if( $cid eq $chid ) {
 								if( defined $episode ) {
-									$rec_m3u = $rec_m3u . "#EXTINF:0001 tvg-id=\"\" group-title=\"$group_txt\" tvg-logo=\"" . $image . "\", " . $record_local . " | " . $name . " (" . $episode . ") | " . $cname . "\n";
+									$rec_m3u = $rec_m3u . "#EXTINF:0001 tvg-id=\"$pid\" group-title=\"$group_txt\" tvg-logo=\"" . $image . "\", " . $record_local . " | " . $name . " (" . $episode . ") | " . $cname . "\n";
 								} else {
-									$rec_m3u = $rec_m3u . "#EXTINF:0001 tvg-id=\"\" group-title=\"$group_txt\" tvg-logo=\"" . $image . "\", " . $record_local . " | " . $name . " | " . $cname . "\n";
+									$rec_m3u = $rec_m3u . "#EXTINF:0001 tvg-id=\"$pid\" group-title=\"$group_txt\" tvg-logo=\"" . $image . "\", " . $record_local . " | " . $name . " | " . $cname . "\n";
 								}
 								
 								# BASE URL
@@ -2999,6 +3177,7 @@ sub http_child {
 					my $episode      = $rec_data->{'epg_subtitle'};
 					my $cname        = $rec_data->{'channel_display_name'};
 					my $chid         = $rec_data->{'channel_id'};
+					my $tele_id      = $rec_data->{'tele_id'};
 					my $record_start = $rec_data->{'start_utc'};
 					my $image        = $rec_data->{'epg_img_url'};
 					my $rid          = $rec_data->{'id'};
@@ -3031,12 +3210,12 @@ sub http_child {
 					
 					if( defined $episode ) {
 						if( $episode ne "" ) {
-							$rec_m3u = $rec_m3u . "#EXTINF:0001 tvg-id=\"\" group-title=\"$group_txt\" tvg-logo=\"" . $image . "\", " . $record_local . " | " . $name . " (" . $episode . ") | " . $cname . "\n";
+							$rec_m3u = $rec_m3u . "#EXTINF:0001 tvg-id=\"$tele_id\" group-title=\"$group_txt\" tvg-logo=\"" . $image . "\", " . $record_local . " | " . $name . " (" . $episode . ") | " . $cname . "\n";
 						} else {
-							$rec_m3u = $rec_m3u . "#EXTINF:0001 tvg-id=\"\" group-title=\"$group_txt\" tvg-logo=\"" . $image . "\", " . $record_local . " | " . $name . " | " . $cname . "\n";
+							$rec_m3u = $rec_m3u . "#EXTINF:0001 tvg-id=\"$tele_id\" group-title=\"$group_txt\" tvg-logo=\"" . $image . "\", " . $record_local . " | " . $name . " | " . $cname . "\n";
 						}
 					} else {
-						$rec_m3u = $rec_m3u . "#EXTINF:0001 tvg-id=\"\" group-title=\"$group_txt\" tvg-logo=\"" . $image . "\", " . $record_local . " | " . $name . " | " . $cname . "\n";
+						$rec_m3u = $rec_m3u . "#EXTINF:0001 tvg-id=\"$tele_id\" group-title=\"$group_txt\" tvg-logo=\"" . $image . "\", " . $record_local . " | " . $name . " | " . $cname . "\n";
 					}
 					
 					# BASE URL
@@ -5920,10 +6099,10 @@ sub http_child {
 							$second_link_audio_url = $uri . "/" . $second_final_quality_audio . $3 . $4;
 						}
 							
-						$link_video_url =~ s/https:\/\/zattoo-hls5-live.akamaized.net/https:\/\/$server-hls5-live.zahs.tv/g;
+						$link_video_url =~ s/https:\/\/zattoo-hls[57]-live.akamaized.net/https:\/\/$server-hls5-live.zahs.tv/g;
 						$link_video_url =~ s/https:\/\/.*zahs.tv/https:\/\/$server-hls5-live.zahs.tv/g;
 							
-						$link_audio_url =~ s/https:\/\/zattoo-hls5-live.akamaized.net/https:\/\/$server-hls5-live.zahs.tv/g;
+						$link_audio_url =~ s/https:\/\/zattoo-hls[57]-live.akamaized.net/https:\/\/$server-hls5-live.zahs.tv/g;
 						$link_audio_url =~ s/https:\/\/.*zahs.tv/https:\/\/$server-hls5-live.zahs.tv/g;
 						
 						if( defined $multi and defined $second_link_audio_url ) {
@@ -6943,7 +7122,7 @@ sub http_child {
 				$c->close;
 				exit;
 			} elsif( $remove_response->is_success ) {
-				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "SUCCESS: Recording removed\n\n";
+				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "SUCCESS: Recording removed\n\n";
 				
 				my $response = HTTP::Response->new( 200, 'OK');
 				$response->header('Content-Type' => 'text'),
@@ -6989,7 +7168,7 @@ sub http_child {
 				$c->close;
 				exit;
 			} elsif( $remove_response->is_success ) {
-				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "SUCCESS: Recording removed\n\n";
+				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "SUCCESS: Recording removed\n\n";
 				
 				my $response = HTTP::Response->new( 200, 'OK');
 				$response->header('Content-Type' => 'text'),
@@ -6998,8 +7177,205 @@ sub http_child {
 				$c->close;
 				exit;
 			}
-			
 		
+		
+		#
+		# PROVIDE ZATTOO VOD INFORMATION
+		#
+		
+		} elsif( defined $vod_info and $provider eq "zattoo.com" ) {
+			
+			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "VOD INFO $vod_info - Retrieving data\n";
+			
+			my $info_url   = "https://zattoo.com/zapi/avod/videos/$vod_info";
+			
+			# COOKIE
+			my $cookie_jar    = HTTP::Cookies->new;
+			$cookie_jar->set_cookie(0,'beaker.session.id',$session_token,'/',$provider,443);
+			
+			# INFO REQUEST
+			my $info_agent = LWP::UserAgent->new(
+				ssl_opts => {
+					SSL_verify_mode => $ssl_mode,
+					verify_hostname => $ssl_mode,
+					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+				},
+				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+			);
+				
+			$info_agent->cookie_jar($cookie_jar);
+			my $info_request  = HTTP::Request::Common::GET($info_url);
+			my $info_response = $info_agent->request($info_request);
+			
+			if( $info_response->is_error ) {
+				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "VOD INFO $vod_info - Invalid response\n\n";
+				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
+				
+				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
+				$response->header('Content-Type' => 'text'),
+				$response->content("API ERROR: Invalid response on VoD info request");
+				$c->send_response($response);
+				$c->close;
+				exit;
+			} elsif( $info_response->is_success ) {
+				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "VOD INFO $vod_info - JSON file sent to client\n";
+				
+				my $response = HTTP::Response->new( 200, 'OK');
+				$response->header('Content-Type' => 'application/json'),
+				$response->content($info_response->content);
+				$c->send_response($response);
+				$c->close;
+				exit;
+			}
+		
+		
+		#
+		# PROVIDE ZATTOO MOVIE VOD INFORMATION
+		#
+		
+		} elsif( defined $mov_info and $provider eq "zattoo.com" ) {
+			
+			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "MOVIE VOD INFO $mov_info - Retrieving data\n";
+			
+			my $info_url   = "https://zattoo.com/zapi/vod/movies/$mov_info";
+			
+			# COOKIE
+			my $cookie_jar    = HTTP::Cookies->new;
+			$cookie_jar->set_cookie(0,'beaker.session.id',$session_token,'/',$provider,443);
+			
+			# INFO REQUEST
+			my $info_agent = LWP::UserAgent->new(
+				ssl_opts => {
+					SSL_verify_mode => $ssl_mode,
+					verify_hostname => $ssl_mode,
+					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+				},
+				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+			);
+				
+			$info_agent->cookie_jar($cookie_jar);
+			my $info_request  = HTTP::Request::Common::GET($info_url);
+			my $info_response = $info_agent->request($info_request);
+			
+			if( $info_response->is_error ) {
+				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "MOVIE VOD INFO $mov_info - Invalid response\n\n";
+				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
+				
+				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
+				$response->header('Content-Type' => 'text'),
+				$response->content("API ERROR: Invalid response on Movie VoD info request");
+				$c->send_response($response);
+				$c->close;
+				exit;
+			} elsif( $info_response->is_success ) {
+				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "MOVIE VOD INFO $mov_info - JSON file sent to client\n";
+				
+				my $response = HTTP::Response->new( 200, 'OK');
+				$response->header('Content-Type' => 'application/json'),
+				$response->content($info_response->content);
+				$c->send_response($response);
+				$c->close;
+				exit;
+			}
+		
+		
+		#
+		# PROVIDE ZATTOO RECORDING INFORMATION
+		#
+		
+		} elsif( defined $info and $provider ne "wilmaa.com" ) {
+			
+			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Retrieving data\n";
+			
+			# URL
+			my $info_url   = "https://$provider/zapi/v2/cached/program/power_details/$powerid?program_ids=$info";
+				
+			# COOKIE
+			my $cookie_jar    = HTTP::Cookies->new;
+			$cookie_jar->set_cookie(0,'beaker.session.id',$session_token,'/',$provider,443);
+			
+			# INFO REQUEST
+			my $info_agent = LWP::UserAgent->new(
+				ssl_opts => {
+					SSL_verify_mode => $ssl_mode,
+					verify_hostname => $ssl_mode,
+					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+				},
+				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+			);
+				
+			$info_agent->cookie_jar($cookie_jar);
+			my $info_request  = HTTP::Request::Common::GET($info_url);
+			my $info_response = $info_agent->request($info_request);
+			
+			if( $info_response->is_error ) {
+				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Invalid response\n\n";
+				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
+				
+				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
+				$response->header('Content-Type' => 'text'),
+				$response->content("API ERROR: Invalid response on rec info request");
+				$c->send_response($response);
+				$c->close;
+				exit;
+			} elsif( $info_response->is_success ) {
+				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - JSON file sent to client\n";
+				
+				my $response = HTTP::Response->new( 200, 'OK');
+				$response->header('Content-Type' => 'application/json'),
+				$response->content($info_response->content);
+				$c->send_response($response);
+				$c->close;
+				exit;
+			}
+		
+		
+		#
+		# PROVIDE WILMAA RECORDING INFORMATION
+		#
+		
+		} elsif( defined $info and $provider eq "wilmaa.com" ) {
+			
+			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Retrieving data\n";
+			
+			# URLs
+			my $info_url  = "https://tvprogram.wilmaa.com/programs/$info/info.json";
+				
+			# INFO REQUEST
+			my $info_agent = LWP::UserAgent->new(
+				ssl_opts => {
+					SSL_verify_mode => $ssl_mode,
+					verify_hostname => $ssl_mode,
+					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+				},
+				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+			);
+				
+			my $info_request  = HTTP::Request::Common::GET($info_url);
+			my $info_response = $info_agent->request($info_request);
+				
+			if( $info_response->is_error ) {
+				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Invalid response\n\n";
+				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
+				
+				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
+				$response->header('Content-Type' => 'text'),
+				$response->content("API ERROR: Invalid response on rec info request");
+				$c->send_response($response);
+				$c->close;
+				exit;
+			} else {
+				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - JSON file sent to client\n";
+				
+				my $response = HTTP::Response->new( 200, 'OK');
+				$response->header('Content-Type' => 'application/json'),
+				$response->content($info_response->content);
+				$c->send_response($response);
+				$c->close;
+				exit;
+			}
+			
+			
 		#
 		# INVALID REQUEST
 		#
