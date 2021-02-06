@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-#      Copyright (C) 2019-2020 Jan-Luca Neumann
+#      Copyright (C) 2019-2021 Jan-Luca Neumann
 #      https://github.com/sunsettrack4/telerising/
 #
 #      Collaborators:
@@ -32,7 +32,7 @@ my $tee = new IO::Tee(\*STDOUT, ">>log.txt");
 select $tee;
 
 print "\n =========================                     I             +        \n";
-print " TELERISING API v0.4.1                          I    I         +        \n";
+print " TELERISING API v0.4.5                          I    I         +        \n";
 print " =========================                       I  I       +      +    \n";
 print "                                                  II                    \n";
 print "ZZZZZZZZZ       AA     TTTTTTTTTT TTTTTTTTTT    888888        888888    \n";
@@ -231,7 +231,7 @@ sub login_process {
 				$zserver = "fr5-0";
 			} elsif( $zserver eq "" ) {
 				$zserver = "fr5-0";
-			} elsif( $zserver =~ /fr5-[0-5]|fra3-[0-3]|zh2-[0-9]|zba6-[0-2]|1und1-fra1902-[1-4]|1und1-hhb1000-[1-4]|1und1-dus1901-[1-4]|1und1-ess1901-[1-2]|1und1-stu1903-[1-2]|matterlau1-[0-1]|matterzrh1-[0-1]/ ) {
+			} elsif( $zserver =~ /fr5-[0-5]|fra3-[0-3]|zh2-[0-9]|zba6-[0-2]|1und1-fra1902-[1-4]|1und1-hhb1000-[1-4]|1und1-dus1901-[1-4]|1und1-ess1901-[1-2]|1und1-stu1903-[1-2]|matterlau1-[0-1]|matterzrh1-[0-1]|1und1-unn1101-[1-2]|1und1-mun1901-[1-2]|1und1-mun1902-[1-4]|1und1-dor1101-[1-2]|1und1-dor1901-[1-2]|1und1-wup1101-[1-2]/ ) {
 				INFO "Custom Zattoo server \"$zserver\" will be used.\n";
 			} else {
 				INFO "Custom Zattoo server \"$zserver\" is not supported, default server will be used instead.\n";
@@ -782,7 +782,7 @@ sub login_process {
 					}
 					
 					my $token_url = $js_response->content;
-					$token_url =~ s/(.*)(token-.*)(\.json"})(.*)/$2\.json/g;
+					$token_url =~ s/(.*)(token-+(.*?)\.json)(.*)/$2/g;
 					
 					if( not defined $2 ) {
 						ERROR "UNABLE TO LOGIN TO WEBSERVICE! (unable to parse token URL)\n\n";
@@ -793,7 +793,7 @@ sub login_process {
 					}
 
 					# GET APPTOKEN
-					my $apptoken_url = "https://$provider/$2.json";
+					my $apptoken_url = "https://$provider/$2";
 					
 					my $apptoken_agent    = LWP::UserAgent->new(
 						ssl_opts => {
@@ -1030,6 +1030,8 @@ sub login_process {
 				
 				if( $country eq "CH" ) {
 					INFO "COUNTRY: SWITZERLAND\n";
+				} elsif( $country eq "AT" ) {
+					INFO "COUNTRY: AUSTRIA\n";
 				} elsif( $country eq "DE" ) {
 					INFO "COUNTRY: GERMANY\n";
 				} elsif( $provider eq "zattoo.com" ) {
@@ -1084,6 +1086,35 @@ sub login_process {
 					} elsif( $alias ne "DE" and $product_code =~ /PREMIUM|ULTIMATE/ ) {
 						if( $alias =~ /BE|FR|IT|LU|NL|DK|IE|UK|GR|PT|ES|FI|AT|SE|EE|LT|LV|MT|PL|SK|SI|CZ|HU|CY|BG|RO|HR|GP|GY|MQ|RE|YT|AN/ ) {
 							INFO "No German IP address detected, Zattoo services can be used within the EU.\n";
+							$tv_mode = "live";
+						} else {
+							ERROR "No supported IP address (EU) detected, Zattoo services can't be used.\n\n";
+							open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+							print $error_file "ERROR: No supported IP address (EU) detected, Zattoo services can't be used.";
+							close $error_file;
+							exit;
+						}
+					} else {
+						$tv_mode = "live";
+					}
+				
+				} elsif( $country eq "AT" and $provider eq "zattoo.com" ) {
+					
+					if( $alias ne "AT" and $product_code eq "FREE" ) {
+						ERROR "No Austrian IP address detected, Zattoo services can't be used.\n\n";
+						open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+						print $error_file "ERROR: No Austrian IP address detected, Zattoo services can't be used.";
+						close $error_file;
+						exit;
+					} elsif ( $alias eq "AT" and $product_code eq "FREE" ) {
+						ERROR "Invalid account type detected, Zattoo services can't be used.\n\n";
+						open my $error_file, ">", "error.txt" or die ERROR  "UNABLE TO CREATE ERROR FILE!\n\n";
+						print $error_file "ERROR: Invalid account type detected, Zattoo services can't be used.";
+						close $error_file;
+						exit;
+					} elsif( $alias ne "AT" and $product_code =~ /PREMIUM|ULTIMATE/ ) {
+						if( $alias =~ /BE|FR|IT|LU|NL|DK|IE|UK|GR|PT|ES|FI|DE|SE|EE|LT|LV|MT|PL|SK|SI|CZ|HU|CY|BG|RO|HR|GP|GY|MQ|RE|YT|AN/ ) {
+							INFO "No Austrian IP address detected, Zattoo services can be used within the EU.\n";
 							$tv_mode = "live";
 						} else {
 							ERROR "No supported IP address (EU) detected, Zattoo services can't be used.\n\n";
@@ -1239,11 +1270,18 @@ sub login_process {
 										$teaser_title =~ s/,/ /g;
 										$teaser_title =~ s/-/_/g;
 										
-										
-										if( defined $teaser_text ) {
-											$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\" tvg-logo=\"https://images.zattic.com/cms/" . $teaser_image . "/format_320x180.jpg\", " . $teaser_title . " (" . $teaser_text . ")\n";
+										if( defined $teaser_image ) {
+											if( defined $teaser_text ) {
+												$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\" tvg-logo=\"https://images.zattic.com/cms/" . $teaser_image . "/format_320x180.jpg\", " . $teaser_title . " (" . $teaser_text . ")\n";
+											} else {
+												$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\" tvg-logo=\"https://images.zattic.com/cms/" . $teaser_image . "/format_320x180.jpg\", " . $teaser_title . "\n";
+											}
 										} else {
-											$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\" tvg-logo=\"https://images.zattic.com/cms/" . $teaser_image . "/format_320x180.jpg\", " . $teaser_title . "\n";
+											if( defined $teaser_text ) {
+												$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\", " . $teaser_title . " (" . $teaser_text . ")\n";
+											} else {
+												$vod_m3u = $vod_m3u . "#EXTINF:0001 tvg-id=\"" . $teaser_code . "\" group-title=\"" . $header_name . "\", " . $teaser_title . "\n";
+											}
 										}
 										
 										if( $teaser_type eq "Avod::Video" ) {
@@ -4571,7 +4609,7 @@ sub http_child {
 						# EDIT PLAYLIST
 						print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "VOD $vod | $quality | $platform - Editing M3U8\n";
 						$link        =~ /(.*)(NAME=")(.*)(",DEFAULT=.*)($final_quality_audio.*?z32=)(.*)"/m;
-						my $link_video_url = $uri . "/" . "t_track_video_bw_$final_quality_video" . "_num_0.m3u8?z32=" . $6;
+						my $link_video_url = $uri . "/" . "t_track_video_bw_$final_quality_video" . "_num_0_tid_1_nd_4000_mbr_5000_vd_1000000.m3u8?z32=" . $6;
 						my $link_audio_url = $uri . "/" . $5 . $6;
 						my $language = $3;
 						
@@ -5026,7 +5064,7 @@ sub http_child {
 						# EDIT PLAYLIST
 						print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "MOVIE $movie_vod | $quality | $platform - Editing M3U8\n";
 						$link        =~ /(.*)(NAME=")(.*)(",DEFAULT=.*)($final_quality_audio.*?z32=)(.*)"/m;
-						my $link_video_url = $uri . "/" . "t_track_video_bw_$final_quality_video" . "_num_0.m3u8?z32=" . $6;
+						my $link_video_url = $uri . "/" . "t_track_video_bw_$final_quality_video" . "_num_0_tid_1_nd_4000_mbr_5000_vd_1000000.m3u8.m3u8?z32=" . $6;
 						my $link_audio_url = $uri . "/" . $5 . $6;
 						my $language = $3;
 						
@@ -7177,205 +7215,14 @@ sub http_child {
 				$c->close;
 				exit;
 			}
+==== BASE ====
+==== BASE ====
+			
+==== BASE ====
+==== BASE ====
 		
-		
-		#
-		# PROVIDE ZATTOO VOD INFORMATION
-		#
-		
-		} elsif( defined $vod_info and $provider eq "zattoo.com" ) {
-			
-			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "VOD INFO $vod_info - Retrieving data\n";
-			
-			my $info_url   = "https://zattoo.com/zapi/avod/videos/$vod_info";
-			
-			# COOKIE
-			my $cookie_jar    = HTTP::Cookies->new;
-			$cookie_jar->set_cookie(0,'beaker.session.id',$session_token,'/',$provider,443);
-			
-			# INFO REQUEST
-			my $info_agent = LWP::UserAgent->new(
-				ssl_opts => {
-					SSL_verify_mode => $ssl_mode,
-					verify_hostname => $ssl_mode,
-					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
-				},
-				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
-			);
-				
-			$info_agent->cookie_jar($cookie_jar);
-			my $info_request  = HTTP::Request::Common::GET($info_url);
-			my $info_response = $info_agent->request($info_request);
-			
-			if( $info_response->is_error ) {
-				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "VOD INFO $vod_info - Invalid response\n\n";
-				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
-				
-				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
-				$response->header('Content-Type' => 'text'),
-				$response->content("API ERROR: Invalid response on VoD info request");
-				$c->send_response($response);
-				$c->close;
-				exit;
-			} elsif( $info_response->is_success ) {
-				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "VOD INFO $vod_info - JSON file sent to client\n";
-				
-				my $response = HTTP::Response->new( 200, 'OK');
-				$response->header('Content-Type' => 'application/json'),
-				$response->content($info_response->content);
-				$c->send_response($response);
-				$c->close;
-				exit;
-			}
-		
-		
-		#
-		# PROVIDE ZATTOO MOVIE VOD INFORMATION
-		#
-		
-		} elsif( defined $mov_info and $provider eq "zattoo.com" ) {
-			
-			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "MOVIE VOD INFO $mov_info - Retrieving data\n";
-			
-			my $info_url   = "https://zattoo.com/zapi/vod/movies/$mov_info";
-			
-			# COOKIE
-			my $cookie_jar    = HTTP::Cookies->new;
-			$cookie_jar->set_cookie(0,'beaker.session.id',$session_token,'/',$provider,443);
-			
-			# INFO REQUEST
-			my $info_agent = LWP::UserAgent->new(
-				ssl_opts => {
-					SSL_verify_mode => $ssl_mode,
-					verify_hostname => $ssl_mode,
-					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
-				},
-				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
-			);
-				
-			$info_agent->cookie_jar($cookie_jar);
-			my $info_request  = HTTP::Request::Common::GET($info_url);
-			my $info_response = $info_agent->request($info_request);
-			
-			if( $info_response->is_error ) {
-				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "MOVIE VOD INFO $mov_info - Invalid response\n\n";
-				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
-				
-				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
-				$response->header('Content-Type' => 'text'),
-				$response->content("API ERROR: Invalid response on Movie VoD info request");
-				$c->send_response($response);
-				$c->close;
-				exit;
-			} elsif( $info_response->is_success ) {
-				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "MOVIE VOD INFO $mov_info - JSON file sent to client\n";
-				
-				my $response = HTTP::Response->new( 200, 'OK');
-				$response->header('Content-Type' => 'application/json'),
-				$response->content($info_response->content);
-				$c->send_response($response);
-				$c->close;
-				exit;
-			}
-		
-		
-		#
-		# PROVIDE ZATTOO RECORDING INFORMATION
-		#
-		
-		} elsif( defined $info and $provider ne "wilmaa.com" ) {
-			
-			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Retrieving data\n";
-			
-			# URL
-			my $info_url   = "https://$provider/zapi/v2/cached/program/power_details/$powerid?program_ids=$info";
-				
-			# COOKIE
-			my $cookie_jar    = HTTP::Cookies->new;
-			$cookie_jar->set_cookie(0,'beaker.session.id',$session_token,'/',$provider,443);
-			
-			# INFO REQUEST
-			my $info_agent = LWP::UserAgent->new(
-				ssl_opts => {
-					SSL_verify_mode => $ssl_mode,
-					verify_hostname => $ssl_mode,
-					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
-				},
-				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
-			);
-				
-			$info_agent->cookie_jar($cookie_jar);
-			my $info_request  = HTTP::Request::Common::GET($info_url);
-			my $info_response = $info_agent->request($info_request);
-			
-			if( $info_response->is_error ) {
-				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Invalid response\n\n";
-				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
-				
-				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
-				$response->header('Content-Type' => 'text'),
-				$response->content("API ERROR: Invalid response on rec info request");
-				$c->send_response($response);
-				$c->close;
-				exit;
-			} elsif( $info_response->is_success ) {
-				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - JSON file sent to client\n";
-				
-				my $response = HTTP::Response->new( 200, 'OK');
-				$response->header('Content-Type' => 'application/json'),
-				$response->content($info_response->content);
-				$c->send_response($response);
-				$c->close;
-				exit;
-			}
-		
-		
-		#
-		# PROVIDE WILMAA RECORDING INFORMATION
-		#
-		
-		} elsif( defined $info and $provider eq "wilmaa.com" ) {
-			
-			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Retrieving data\n";
-			
-			# URLs
-			my $info_url  = "https://tvprogram.wilmaa.com/programs/$info/info.json";
-				
-			# INFO REQUEST
-			my $info_agent = LWP::UserAgent->new(
-				ssl_opts => {
-					SSL_verify_mode => $ssl_mode,
-					verify_hostname => $ssl_mode,
-					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
-				},
-				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
-			);
-				
-			my $info_request  = HTTP::Request::Common::GET($info_url);
-			my $info_response = $info_agent->request($info_request);
-				
-			if( $info_response->is_error ) {
-				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Invalid response\n\n";
-				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
-				
-				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
-				$response->header('Content-Type' => 'text'),
-				$response->content("API ERROR: Invalid response on rec info request");
-				$c->send_response($response);
-				$c->close;
-				exit;
-			} else {
-				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - JSON file sent to client\n";
-				
-				my $response = HTTP::Response->new( 200, 'OK');
-				$response->header('Content-Type' => 'application/json'),
-				$response->content($info_response->content);
-				$c->send_response($response);
-				$c->close;
-				exit;
-			}
-			
-			
+==== BASE ====
+==== BASE ====
 		#
 		# INVALID REQUEST
 		#
