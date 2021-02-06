@@ -1949,7 +1949,7 @@ sub http_child {
 											if( $altdomain eq "false" ) {
 												$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 											} else {
-												$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
+												$base_m3u_url = "http://$altdomain/index.m3u8?channel=" . $chid;
 											}
 											
 											# IF QUERY STRING FOR PLATFORM IS SET
@@ -2031,7 +2031,7 @@ sub http_child {
 												if( $altdomain eq "false" ) {
 													$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 												} else {
-													$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
+													$base_m3u_url = "http://$altdomain/index.m3u8?channel=" . $chid;
 												}
 												
 												# IF QUERY STRING FOR PLATFORM IS SET
@@ -2129,7 +2129,7 @@ sub http_child {
 									if( $altdomain eq "false" ) {
 										$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 									} else {
-										$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
+										$base_m3u_url = "http://$altdomain/index.m3u8?channel=" . $chid;
 									}
 									
 									# IF QUERY STRING FOR PLATFORM IS SET
@@ -2211,7 +2211,7 @@ sub http_child {
 										if( $altdomain eq "false" ) {
 											$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 										} else {
-											$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
+											$base_m3u_url = "http://$altdomain/index.m3u8?channel=" . $chid;
 										}
 										
 										# IF QUERY STRING FOR PLATFORM IS SET
@@ -2659,7 +2659,7 @@ sub http_child {
 										if( $altdomain eq "false" ) {
 											$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 										} else {
-											$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
+											$base_m3u_url = "http://$altdomain/index.m3u8?channel=" . $chid;
 										}
 									
 										# IF QUERY STRING FOR PLATFORM IS SET
@@ -2744,7 +2744,7 @@ sub http_child {
 								if( $altdomain eq "false" ) {
 									$base_m3u_url = "http://$hostip:$port/index.m3u8?channel=" . $chid;
 								} else {
-									$base_m3u_url = "$altdomain/index.m3u8?channel=" . $chid;
+									$base_m3u_url = "http://$altdomain/index.m3u8?channel=" . $chid;
 								}
 								
 								# IF QUERY STRING FOR PLATFORM IS SET
@@ -3008,7 +3008,7 @@ sub http_child {
 								if( $altdomain eq "false" ) {
 									$base_m3u_url = "http://$hostip:$port/index.m3u8?recording=" . $rid;
 								} else {
-									$base_m3u_url = "$altdomain/index.m3u8?recording=" . $rid;
+									$base_m3u_url = "http://$altdomain/index.m3u8?recording=" . $rid;
 								}
 										
 								# IF QUERY STRING FOR PLATFORM IS SET
@@ -3261,7 +3261,7 @@ sub http_child {
 					if( $altdomain eq "false" ) {
 						$base_m3u_url = "http://$hostip:$port/index.m3u8?recording=" . $rid;
 					} else {
-						$base_m3u_url = "$altdomain/index.m3u8?recording=" . $rid;
+						$base_m3u_url = "http://$altdomain/index.m3u8?recording=" . $rid;
 					}
 								
 					# IF QUERY STRING FOR PLATFORM IS SET
@@ -7215,14 +7215,205 @@ sub http_child {
 				$c->close;
 				exit;
 			}
-==== BASE ====
-==== BASE ====
-			
-==== BASE ====
-==== BASE ====
 		
-==== BASE ====
-==== BASE ====
+		
+		#
+		# PROVIDE ZATTOO VOD INFORMATION
+		#
+		
+		} elsif( defined $vod_info and $provider eq "zattoo.com" ) {
+			
+			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "VOD INFO $vod_info - Retrieving data\n";
+			
+			my $info_url   = "https://zattoo.com/zapi/avod/videos/$vod_info";
+			
+			# COOKIE
+			my $cookie_jar    = HTTP::Cookies->new;
+			$cookie_jar->set_cookie(0,'beaker.session.id',$session_token,'/',$provider,443);
+			
+			# INFO REQUEST
+			my $info_agent = LWP::UserAgent->new(
+				ssl_opts => {
+					SSL_verify_mode => $ssl_mode,
+					verify_hostname => $ssl_mode,
+					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+				},
+				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+			);
+				
+			$info_agent->cookie_jar($cookie_jar);
+			my $info_request  = HTTP::Request::Common::GET($info_url);
+			my $info_response = $info_agent->request($info_request);
+			
+			if( $info_response->is_error ) {
+				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "VOD INFO $vod_info - Invalid response\n\n";
+				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
+				
+				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
+				$response->header('Content-Type' => 'text'),
+				$response->content("API ERROR: Invalid response on VoD info request");
+				$c->send_response($response);
+				$c->close;
+				exit;
+			} elsif( $info_response->is_success ) {
+				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "VOD INFO $vod_info - JSON file sent to client\n";
+				
+				my $response = HTTP::Response->new( 200, 'OK');
+				$response->header('Content-Type' => 'application/json'),
+				$response->content($info_response->content);
+				$c->send_response($response);
+				$c->close;
+				exit;
+			}
+		
+		
+		#
+		# PROVIDE ZATTOO MOVIE VOD INFORMATION
+		#
+		
+		} elsif( defined $mov_info and $provider eq "zattoo.com" ) {
+			
+			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "MOVIE VOD INFO $mov_info - Retrieving data\n";
+			
+			my $info_url   = "https://zattoo.com/zapi/vod/movies/$mov_info";
+			
+			# COOKIE
+			my $cookie_jar    = HTTP::Cookies->new;
+			$cookie_jar->set_cookie(0,'beaker.session.id',$session_token,'/',$provider,443);
+			
+			# INFO REQUEST
+			my $info_agent = LWP::UserAgent->new(
+				ssl_opts => {
+					SSL_verify_mode => $ssl_mode,
+					verify_hostname => $ssl_mode,
+					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+				},
+				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+			);
+				
+			$info_agent->cookie_jar($cookie_jar);
+			my $info_request  = HTTP::Request::Common::GET($info_url);
+			my $info_response = $info_agent->request($info_request);
+			
+			if( $info_response->is_error ) {
+				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "MOVIE VOD INFO $mov_info - Invalid response\n\n";
+				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
+				
+				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
+				$response->header('Content-Type' => 'text'),
+				$response->content("API ERROR: Invalid response on Movie VoD info request");
+				$c->send_response($response);
+				$c->close;
+				exit;
+			} elsif( $info_response->is_success ) {
+				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "MOVIE VOD INFO $mov_info - JSON file sent to client\n";
+				
+				my $response = HTTP::Response->new( 200, 'OK');
+				$response->header('Content-Type' => 'application/json'),
+				$response->content($info_response->content);
+				$c->send_response($response);
+				$c->close;
+				exit;
+			}
+		
+		
+		#
+		# PROVIDE ZATTOO RECORDING INFORMATION
+		#
+		
+		} elsif( defined $info and $provider ne "wilmaa.com" ) {
+			
+			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Retrieving data\n";
+			
+			# URL
+			my $info_url   = "https://$provider/zapi/v2/cached/program/power_details/$powerid?program_ids=$info";
+				
+			# COOKIE
+			my $cookie_jar    = HTTP::Cookies->new;
+			$cookie_jar->set_cookie(0,'beaker.session.id',$session_token,'/',$provider,443);
+			
+			# INFO REQUEST
+			my $info_agent = LWP::UserAgent->new(
+				ssl_opts => {
+					SSL_verify_mode => $ssl_mode,
+					verify_hostname => $ssl_mode,
+					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+				},
+				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+			);
+				
+			$info_agent->cookie_jar($cookie_jar);
+			my $info_request  = HTTP::Request::Common::GET($info_url);
+			my $info_response = $info_agent->request($info_request);
+			
+			if( $info_response->is_error ) {
+				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Invalid response\n\n";
+				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
+				
+				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
+				$response->header('Content-Type' => 'text'),
+				$response->content("API ERROR: Invalid response on rec info request");
+				$c->send_response($response);
+				$c->close;
+				exit;
+			} elsif( $info_response->is_success ) {
+				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - JSON file sent to client\n";
+				
+				my $response = HTTP::Response->new( 200, 'OK');
+				$response->header('Content-Type' => 'application/json'),
+				$response->content($info_response->content);
+				$c->send_response($response);
+				$c->close;
+				exit;
+			}
+		
+		
+		#
+		# PROVIDE WILMAA RECORDING INFORMATION
+		#
+		
+		} elsif( defined $info and $provider eq "wilmaa.com" ) {
+			
+			print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Retrieving data\n";
+			
+			# URLs
+			my $info_url  = "https://tvprogram.wilmaa.com/programs/$info/info.json";
+				
+			# INFO REQUEST
+			my $info_agent = LWP::UserAgent->new(
+				ssl_opts => {
+					SSL_verify_mode => $ssl_mode,
+					verify_hostname => $ssl_mode,
+					SSL_ca_file => Mozilla::CA::SSL_ca_file()  
+				},
+				agent => "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/72.0"
+			);
+				
+			my $info_request  = HTTP::Request::Common::GET($info_url);
+			my $info_response = $info_agent->request($info_request);
+				
+			if( $info_response->is_error ) {
+				print "X " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - Invalid response\n\n";
+				print "RESPONSE:\n\n" . $info_response->content . "\n\n";
+				
+				my $response = HTTP::Response->new( 500, 'INTERNAL SERVER ERROR');
+				$response->header('Content-Type' => 'text'),
+				$response->content("API ERROR: Invalid response on rec info request");
+				$c->send_response($response);
+				$c->close;
+				exit;
+			} else {
+				print "* " . localtime->strftime('%Y-%m-%d %H:%M:%S ') . "REC INFO $info - JSON file sent to client\n";
+				
+				my $response = HTTP::Response->new( 200, 'OK');
+				$response->header('Content-Type' => 'application/json'),
+				$response->content($info_response->content);
+				$c->send_response($response);
+				$c->close;
+				exit;
+			}
+			
+			
 		#
 		# INVALID REQUEST
 		#
